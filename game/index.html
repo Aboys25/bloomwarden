@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BLOOMWARDEN — Defense of the Last Bloom</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0a120c; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #eef7ee; }
+  #game { position: absolute; display: block; touch-action: none; cursor: crosshair; }
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 2; }
+  .panel { background: rgba(10, 20, 14, 0.78); border: 1px solid rgba(126, 230, 162, 0.25); border-radius: 10px; padding: 8px 12px; }
+  #top-left { position: absolute; top: 14px; left: 14px; min-width: 150px; }
+  #score { font-size: 26px; font-weight: 800; line-height: 1.1; }
+  #best { font-size: 12px; color: #93a893; margin-top: 2px; }
+  #wave-label { font-size: 13px; color: #ffd76a; margin-top: 4px; font-weight: 600; }
+  #top-right { position: absolute; top: 14px; right: 14px; text-align: right; }
+  #shards-row { font-size: 20px; font-weight: 700; color: #ffd76a; }
+  #turret-count { font-size: 12px; color: #93a893; margin-top: 2px; }
+  #boss-bar { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); width: 420px; text-align: center; display: none; }
+  #boss-label { font-size: 13px; font-weight: 800; letter-spacing: 2px; color: #e8b4ff; margin-bottom: 4px; }
+  .bar { height: 10px; border-radius: 6px; background: rgba(255,255,255,0.12); overflow: hidden; }
+  .bar > div { height: 100%; border-radius: 6px; transition: width 0.12s linear; }
+  #boss-fill { background: linear-gradient(90deg, #b388ff, #e8b4ff); }
+  #bottom-left { position: absolute; left: 14px; bottom: 14px; width: 240px; }
+  #bottom-center { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); width: 300px; text-align: center; }
+  #bottom-right { position: absolute; right: 14px; bottom: 14px; width: 240px; text-align: right; }
+  .bar-label { font-size: 11px; letter-spacing: 1.5px; color: #93a893; margin-bottom: 4px; font-weight: 700; }
+  .bar-label .value { color: #eef7ee; letter-spacing: 0; font-size: 12px; }
+  #warden-hp-fill { background: linear-gradient(90deg, #2c6e4a, #7ee6a2); }
+  #bloom-hp-fill { background: linear-gradient(90deg, #b44a9e, #ff7ad9); }
+  #over-fill { background: linear-gradient(90deg, #b8860b, #ffe066); }
+  #over-label.ready { color: #ffe066; }
+  #dash-pip { font-size: 11px; margin-top: 5px; color: #93a893; font-weight: 700; letter-spacing: 1px; }
+  #dash-pip.ready { color: #7ee6a2; }
+  #banner { position: absolute; top: 22%; left: 50%; transform: translateX(-50%); font-size: 44px; font-weight: 900; letter-spacing: 3px; color: #fff6c9; text-shadow: 0 2px 18px rgba(255, 215, 106, 0.55), 0 2px 4px rgba(0,0,0,0.7); display: none; white-space: nowrap; }
+  #mute-badge { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); margin-bottom: 56px; font-size: 12px; color: #93a893; display: none; letter-spacing: 2px; }
+  .screen { position: fixed; inset: 0; z-index: 3; display: none; align-items: center; justify-content: center; background: rgba(5, 10, 7, 0.55); }
+  .card { background: rgba(10, 20, 14, 0.92); border: 1px solid rgba(126, 230, 162, 0.35); border-radius: 16px; padding: 32px 44px; text-align: center; max-width: 560px; box-shadow: 0 18px 60px rgba(0,0,0,0.6); }
+  .card h1 { margin: 0 0 4px; font-size: 52px; letter-spacing: 4px; color: #ff7ad9; text-shadow: 0 0 24px rgba(255, 122, 217, 0.45); }
+  .card h2 { margin: 0 0 8px; font-size: 36px; letter-spacing: 2px; }
+  .card .sub { margin: 0 0 18px; color: #ffd76a; font-size: 15px; letter-spacing: 1px; }
+  .card p { margin: 8px 0; color: #c9d8c9; font-size: 15px; line-height: 1.5; }
+  .controls { display: grid; grid-template-columns: auto 1fr; gap: 5px 14px; text-align: left; margin: 16px auto 6px; width: fit-content; font-size: 14px; }
+  .controls b { color: #7ee6a2; font-weight: 700; white-space: nowrap; }
+  .big-button { pointer-events: auto; margin-top: 20px; font-size: 19px; font-weight: 800; letter-spacing: 1.5px; color: #0a120c; background: linear-gradient(180deg, #8ff0ae, #4cc978); border: none; border-radius: 12px; padding: 13px 34px; cursor: pointer; box-shadow: 0 6px 22px rgba(76, 201, 120, 0.4); }
+  .big-button:hover { filter: brightness(1.1); }
+  .stats { display: flex; gap: 26px; justify-content: center; margin: 14px 0 4px; }
+  .stats div { font-size: 13px; color: #93a893; letter-spacing: 1px; }
+  .stats span { display: block; font-size: 30px; font-weight: 800; color: #eef7ee; letter-spacing: 0; }
+  .hint { font-size: 13px; color: #93a893; margin-top: 14px; }
+  #title-best { font-size: 14px; color: #ffd76a; margin-top: 12px; font-weight: 600; }
+  #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+</style>
+</head>
+<body>
+<canvas id="game" aria-label="BLOOMWARDEN: defend the Last Bloom from waves of void creatures"></canvas>
+<div id="hud">
+  <div id="top-left" class="panel">
+    <div id="score">0</div>
+    <div id="best">Best 0</div>
+    <div id="wave-label">The garden stirs…</div>
+  </div>
+  <div id="boss-bar">
+    <div id="boss-label">THE HERALD</div>
+    <div class="bar"><div id="boss-fill"></div></div>
+  </div>
+  <div id="top-right" class="panel">
+    <div id="shards-row">◆ <span id="shards">10</span></div>
+    <div id="turret-count">Thorns 0/3</div>
+  </div>
+  <div id="bottom-left" class="panel">
+    <div class="bar-label">WARDEN · <span class="value" id="warden-hp-text">100</span></div>
+    <div class="bar"><div id="warden-hp-fill"></div></div>
+    <div id="dash-pip">DASH READY</div>
+  </div>
+  <div id="bottom-center" class="panel">
+    <div class="bar-label">LAST BLOOM · <span class="value" id="bloom-hp-text">120 / 120</span></div>
+    <div class="bar"><div id="bloom-hp-fill"></div></div>
+  </div>
+  <div id="bottom-right" class="panel">
+    <div class="bar-label" id="over-label">Overcharge</div>
+    <div class="bar"><div id="over-fill"></div></div>
+  </div>
+  <div id="banner"></div>
+  <div id="mute-badge">MUTED · M TO UNMUTE</div>
+</div>
+
+<div id="screen-title" class="screen">
+  <div class="card">
+    <h1>BLOOMWARDEN</h1>
+    <p class="sub">DEFENSE OF THE LAST BLOOM</p>
+    <p>The void is coming for the garden's last flower. You are the Warden.<br>Hold the centre through <b>10 waves</b> — and face the Herald twice.</p>
+    <div class="controls">
+      <b>WASD / Arrows</b><span>Move</span>
+      <b>Mouse</b><span>Aim &amp; hold click to shoot</span>
+      <b>Space / Shift</b><span>Dash (briefly untouchable)</span>
+      <b>Q / E / Right-click</b><span>Plant a thorn turret · 25 shards</span>
+      <b>F</b><span>Overcharge when the meter is full</span>
+      <b>P / Esc</b><span>Pause · M mute · R restart</span>
+    </div>
+    <button class="big-button" data-action="start">DEFEND THE BLOOM</button>
+    <div id="title-best">Best score: 0</div>
+  </div>
+</div>
+
+<div id="screen-pause" class="screen">
+  <div class="card">
+    <h2>PAUSED</h2>
+    <p>The garden holds its breath.</p>
+    <button class="big-button" data-action="start">RESUME</button>
+    <p class="hint">P / Esc to resume · R to restart the run</p>
+  </div>
+</div>
+
+<div id="screen-over" class="screen">
+  <div class="card">
+    <h2>THE GARDEN FALLS</h2>
+    <p id="over-reason">The Warden has fallen.</p>
+    <div class="stats">
+      <div>SCORE<span id="over-score">0</span></div>
+      <div>WAVE<span id="over-wave">1</span></div>
+      <div>BANISHED<span id="over-kills">0</span></div>
+      <div>BEST<span id="over-best">0</span></div>
+    </div>
+    <button class="big-button" data-action="start">TRY AGAIN</button>
+    <p class="hint">Press Enter or Space to restart</p>
+  </div>
+</div>
+
+<div id="screen-win" class="screen">
+  <div class="card">
+    <h2>THE BLOOM ENDURES</h2>
+    <p>Ten waves break against the garden — and the last flower still stands.<br>The void retreats. For now.</p>
+    <div class="stats">
+      <div>SCORE<span id="win-score">0</span></div>
+      <div>BANISHED<span id="win-kills">0</span></div>
+      <div>BEST<span id="win-best">0</span></div>
+    </div>
+    <button class="big-button" data-action="start">PLAY AGAIN</button>
+    <p class="hint">Press Enter or Space to play again</p>
+  </div>
+</div>
+
+<p id="status" role="status" aria-live="polite"></p>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
